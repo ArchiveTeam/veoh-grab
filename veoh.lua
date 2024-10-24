@@ -263,7 +263,7 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
       and not processed(url_ .. "/")
       and allowed(url_, origurl) then
       if body_data ~= nil then
-print('POSTing', url)
+--print('POSTing', url)
         table.insert(urls, {
           url=url,
           method="POST",
