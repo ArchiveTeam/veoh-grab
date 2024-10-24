@@ -397,12 +397,12 @@ print('POSTing', url)
           check("https://veoh.com/users/" .. v)
         elseif k == "permalinkId" then
           check("https://veoh.com/watch/" .. v)
-        elseif k == "category" then
+        --[[elseif k == "category" then
           local category = v
           if string.match(category, "^category_") then
             category = string.match(category, "^[^_]+_(.+)$")
           end
-          check("https://veoh.com/list/videos/" .. category)
+          check("https://veoh.com/list/videos/" .. category)]]
         end
       end
     end
@@ -414,7 +414,9 @@ print('POSTing', url)
     body_data = nil
   end
 
-  if allowed(url) and status_code < 300 then
+  if allowed(url)
+    and status_code < 300
+    and not string.match(url, "^https?://[^/]*veoh%.com/file/f/.") then
     html = read_file(file)
     if string.match(html, "^%s+{.+}") then
       json = cjson.decode(html)
@@ -426,6 +428,8 @@ print('POSTing', url)
       end
       context["csrf"] = csrf
       check("https://veoh.com/watch/getVideo/" .. item_value)
+      --local categories = string.match(html, "availableCategories:%s*(%[[^\n]+)")
+      --context["categories"] = cjson.decode(categories)
     elseif string.match(url, "^https?://[^/]*/watch/getVideo/") then
       ids[json["video"]["src"]["poster"]] = true
       queue_with_body("https://veoh.com/watch/" .. item_value .. "/comments/1", "")
@@ -665,6 +669,9 @@ wget.callbacks.write_to_warc = function(url, http_stat)
     if string.match(html, "^%s*{") then
       local json = cjson.decode(html)
       if not json["success"] or json["error"] then
+        if json["error"] == "404-error" then
+          context["404"] = true
+        end
         retry_url = true
         return false
       end
@@ -723,6 +730,10 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
     io.stdout:flush()
     tries = tries + 1
     local maxtries = 5
+    if context["404"]
+      or status_code == 404 then
+      maxtries = 0
+    end
     if tries > maxtries then
       io.stdout:write(" Skipping.\n")
       io.stdout:flush()
