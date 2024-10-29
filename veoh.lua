@@ -432,6 +432,8 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
       --context["categories"] = cjson.decode(categories)
     elseif string.match(url, "^https?://[^/]*/watch/getVideo/") then
       ids[json["video"]["src"]["poster"]] = true
+      json["video"]["src"]["Regular"] = nil
+      html = cjson.encode(json)
       if json["video"]["allowComments"] then
         queue_with_body("https://veoh.com/watch/" .. item_value .. "/comments/1", "")
       end
