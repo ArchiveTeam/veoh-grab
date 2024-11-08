@@ -432,8 +432,8 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
       --context["categories"] = cjson.decode(categories)
     elseif string.match(url, "^https?://[^/]*/watch/getVideo/") then
       ids[json["video"]["src"]["poster"]] = true
-      json["video"]["src"]["Regular"] = nil
-      html = cjson.encode(json)
+      --json["video"]["src"]["Regular"] = nil
+      --html = cjson.encode(json)
       if json["video"]["allowComments"] then
         queue_with_body("https://veoh.com/watch/" .. item_value .. "/comments/1", "")
       end
@@ -650,9 +650,11 @@ wget.callbacks.write_to_warc = function(url, http_stat)
   end
   is_initial_url = false
   is_new_design = false
-  if http_stat["len"] == 0 then
-    retry_url = true
-    return false
+  is_good_404 = false
+  if http_stat["statcode"] == 404
+    and not string.match(url["url"], "^https?://veoh%.com/.")
+    and string.match(url["url"], "^https?://[^/]+%.veoh%.com/.") then
+    is_good_404 = true
   end
   if http_stat["statcode"] == 302 then
     if not string.match(url["url"], "^https?://redirect%.veoh%.com/.") then
@@ -660,13 +662,18 @@ wget.callbacks.write_to_warc = function(url, http_stat)
       return false
     end
   elseif http_stat["statcode"] ~= 200
-    and http_stat["statcode"] ~= 404 then
+    and not is_good_404 then
+    retry_url = true
+    return false
+  end
+  if http_stat["len"] == 0 and not is_good_404 then
     retry_url = true
     return false
   end
   if string.match(url["url"], "^https?://[^/]*veoh%.com/.") then
     local html = read_file(http_stat["local_file"])
-    if string.len(string.match(html, "%s*(.)")) == 0 then
+    if not is_good_404
+      and string.len(string.match(html, "%s*(.)")) == 0 then
       retry_url = true
       return false
     end
