@@ -438,7 +438,7 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
       if json["video"]["allowComments"] then
         queue_with_body("https://veoh.com/watch/" .. item_value .. "/comments/1", "")
       end
-    elseif string.match(url, "^https?://[^/]*/users/[^%?&/]+)") then
+    elseif string.match(url, "^https?://[^/]*/users/[^%?&/]+") then
       queue_with_body(
         "https://veoh.com/users/find-by-username",
         cjson.encode({
@@ -671,7 +671,8 @@ wget.callbacks.write_to_warc = function(url, http_stat)
     retry_url = true
     return false
   end
-  if string.match(url["url"], "^https?://[^/]*veoh%.com/.") then
+  if string.match(url["url"], "^https?://[^/]*veoh%.com/.")
+    and not string.match(url, "^https?://[^/]*veoh%.com/file/f/.") then
     local html = read_file(http_stat["local_file"])
     if not is_good_404
       and http_stat["statcode"] ~= 302
