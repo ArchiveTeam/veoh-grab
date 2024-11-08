@@ -430,7 +430,8 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
       check("https://veoh.com/watch/getVideo/" .. item_value)
       --local categories = string.match(html, "availableCategories:%s*(%[[^\n]+)")
       --context["categories"] = cjson.decode(categories)
-    elseif string.match(url, "^https?://[^/]*/watch/getVideo/") then
+    elseif string.match(url, "^https?://[^/]*/watch/getVideo/")
+      and not context["404"] then
       ids[json["video"]["src"]["poster"]] = true
       --json["video"]["src"]["Regular"] = nil
       --html = cjson.encode(json)
@@ -682,9 +683,10 @@ wget.callbacks.write_to_warc = function(url, http_stat)
       if not json["success"] or json["error"] then
         if json["error"] == "404-error" then
           context["404"] = true
+        else
+          retry_url = true
+          return false
         end
-        retry_url = true
-        return false
       end
     end
   end
