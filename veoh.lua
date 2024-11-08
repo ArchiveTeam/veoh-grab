@@ -672,7 +672,7 @@ wget.callbacks.write_to_warc = function(url, http_stat)
     return false
   end
   if string.match(url["url"], "^https?://[^/]*veoh%.com/.")
-    and not string.match(url, "^https?://[^/]*veoh%.com/file/f/.") then
+    and not string.match(url["url"], "^https?://[^/]*veoh%.com/file/f/.") then
     local html = read_file(http_stat["local_file"])
     if not is_good_404
       and http_stat["statcode"] ~= 302
