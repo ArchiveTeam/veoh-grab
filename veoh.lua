@@ -674,6 +674,7 @@ wget.callbacks.write_to_warc = function(url, http_stat)
   if string.match(url["url"], "^https?://[^/]*veoh%.com/.") then
     local html = read_file(http_stat["local_file"])
     if not is_good_404
+      and http_stat["statcode"] ~= 302
       and string.len(string.match(html, "%s*(.)")) == 0 then
       retry_url = true
       return false
