@@ -84,6 +84,7 @@ find_item = function(url)
     ["^https?://veoh%.com/watch/([0-9a-zA-Z]+)$"]="video",
     ["^https?://veoh%.com/users/([^?&;/]+)$"]="user",
     ["^https?://veoh%.com/list/([^/]+/[0-9a-zA-Z_]+)$"]="list",
+    ["^https?://veoh%.com/list%-c/([0-9a-zA-Z%-_]+)$"]="list-c"
   }) do
     value = string.match(url, pattern)
     type_ = name
@@ -143,7 +144,7 @@ allowed = function(url, parenturl)
     ["^https?://[^/]*veoh%.com/watch/getVideo/([0-9a-zA-Z]+)"]="video",
     ["^https?://[^/]*veoh%.com/watch/([0-9a-zA-Z]+)$"]="video",
     ["^https?://[^/]*veoh%.com/list/([^/]+/[0-9a-zA-Z_]+)$"]="list",
-    
+    ["^https?://[^/]*veoh%.com/list%-c/([0-9a-zA-Z_%-]+)$"]="list-c"
   }) do
     match = string.match(url, pattern)
     if match then
@@ -164,7 +165,7 @@ allowed = function(url, parenturl)
   end
 
   for _, pattern in pairs({
-    "([a-z0-9A-Z]+)",
+    "([a-z0-9A-Z%-_]+)",
     "([^%?&;]+)"
   }) do
     for s in string.gmatch(url, pattern) do
@@ -243,7 +244,6 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
   end
 
   local function check(newurl)
-    local post_body = nil
     local post_url = nil
     if not newurl then
       newurl = ""
@@ -259,19 +259,22 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
     while string.find(url_, "&amp;") do
       url_ = string.gsub(url_, "&amp;", "&")
     end
-    if not processed(url_)
-      and not processed(url_ .. "/")
+    if body_data ~= nil then
+      post_url = url_ .. ";" .. body_data
+    end
+    if not processed(post_url or url_)
       and allowed(url_, origurl) then
       if body_data ~= nil then
---print('POSTing', url)
+print('POSTing', url, body_data)
         table.insert(urls, {
-          url=url,
+          url=url_,
           method="POST",
           body_data=body_data,
           headers={
             ["Content-Type"]="application/json",
             ["X-CSRF-TOKEN"]=context["csrf"],
-            ["X-Requested-With"]="XMLHttpRequest"
+            ["X-Requested-With"]="XMLHttpRequest",
+            ["Referer"]="https://veoh.com/"
           }
         })
       else
@@ -279,8 +282,7 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
           url=url_
         })
       end
-      addedtolist[url_] = true
-      addedtolist[url] = true
+      addedtolist[post_url or url_] = true
     end
   end
 
@@ -388,15 +390,19 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
     return result
   end
 
-  local function extract_json(json)
+  local function extract_json(json, parentkey)
     for k, v in pairs(json) do
       if type(v) == "table" then
-        extract_json(v)
+        extract_json(v, parentkey or k)
       else
         if k == "nickname" or k == "username" then
           check("https://veoh.com/users/" .. v)
         elseif k == "permalinkId" then
-          check("https://veoh.com/watch/" .. v)
+          if parentkey == "videos" then
+            check("https://veoh.com/watch/" .. v)
+          elseif parentkey == "groups" then
+            check("https://veoh.com/list-c/" .. v)
+          end
         --[[elseif k == "category" then
           local category = v
           if string.match(category, "^category_") then
@@ -410,6 +416,7 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
 
   local function queue_with_body(url, body)
     body_data = body
+    ids[url] = true
     check(url)
     body_data = nil
   end
@@ -418,7 +425,7 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
     and status_code < 300
     and not string.match(url, "^https?://[^/]*veoh%.com/file/f/.") then
     html = read_file(file)
-    if string.match(html, "^%s+{.+}") then
+    if string.match(html, "^%s*{.*}") then
       json = cjson.decode(html)
     end
     if string.match(url, "^https?://veoh%.com/watch/[^/%?&;]+$") then
@@ -438,14 +445,7 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
       if json["video"]["allowComments"] then
         queue_with_body("https://veoh.com/watch/" .. item_value .. "/comments/1", "")
       end
-    elseif string.match(url, "^https?://[^/]*/users/[^%?&/]+") then
-      queue_with_body(
-        "https://veoh.com/users/find-by-username",
-        cjson.encode({
-          ["username"]=item_value
-        })
-      )
-    elseif string.match(url, "^https?://[^/]+/users/find-by-username") then
+    elseif string.match(url, "^https?://[^/]+/users/find%-by%-username") then
       for endpoint, data in pairs({
         ["/published/videos"]={
           ["details"]={
@@ -515,6 +515,7 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
         queue_with_body(urlparse.absolute(url, tostring(i)), "")
       end
     elseif string.match(url, "^https?://[^/]*/list%-c/") then
+      context["csrf"] = string.match(html, 'csrfToken:%s*"([^"]+)"') or context["csrf"]
       queue_with_body(
         "https://veoh.com/collectionByPermalink/" .. item_value,
         cjson.encode({["permalink"]=item_value})
@@ -541,6 +542,14 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
         context["pagination"][newurl] = body
         queue_with_body(newurl, cjson.encode(body))
       end
+    elseif string.match(url, "^https?://[^/]*/users/[^%?&/]+") then
+      context["csrf"] = string.match(html, 'csrfToken:%s*"([^"]+)"') or context["csrf"]
+      queue_with_body(
+        "https://veoh.com/users/find-by-username",
+        cjson.encode({
+          ["username"]=item_value
+        })
+      )
     elseif string.match(url, "/list/groups/groups_") -- TODO
       or string.match(url, "/list/videos/")
       or string.match(url, "/list/movies/")
@@ -574,7 +583,7 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
       if not per_page then
         per_page = 18
       end
-      local pages = tonumber(json["totalRecords"]) / per_page
+      local pages = tonumber(json["totalRecords"]) / per_page + 1
       for i=1,pages do
         local bodies = context["pagination"][url]
         if not string.match(url, "/list/category/collections$") then
@@ -582,7 +591,11 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
         end
         for _, body in pairs(bodies) do
           body["page"] = i
-          check(url, cjson.encode(body))
+          queue_with_body(url, cjson.encode(body))
+        end
+        if string.match(url, "/list/group/videos$")
+          and item_type == "list-c" then
+          check("https://veoh.com/list-c/" .. item_value .. "?page=" .. tostring(i))
         end
       end
     end
@@ -602,11 +615,18 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
         count = count + 1
       end
       local body = context["pagination"][url]
-      if count == body["maxResults"] then
-        local pages = json["totalRecords"] / body["maxResults"]
+      if body then
+        local pages = tonumber(json["totalRecords"]) / tonumber(body["maxResults"]) + 1
         for i=1,pages do
           body["page"] = i
           queue_with_body(url, cjson.encode(body))
+          local page = ({
+            ["/published/videos"]="published-videos",
+            ["/favorites"]="favorites-videos",
+            ["/groups/published"]="published-groups",
+            ["/groups/joined"]="joined-groups"
+          })[string.match(url, "^https?://[^/]+/users(/.+)")]
+          check("https://veoh.com/users/" .. item_value .. "/" .. page .. "?page=" .. tostring(i))
         end
       end
     end
@@ -724,7 +744,7 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
     return wget.actions.EXIT
   end
 
-  if status_code >= 300 and status_code <= 399 then
+  if status_code >= 300 and status_code <= 399 and not retry_url then
     local newloc = urlparse.absolute(url["url"], http_stat["newloc"])
     if string.match(url["url"], "^https?://redirect%.veoh%.com/.") then
       ids[newloc] = true

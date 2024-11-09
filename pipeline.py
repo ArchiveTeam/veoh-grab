@@ -77,7 +77,7 @@ if not WGET_AT:
 #
 # Update this each time you make a non-cosmetic change.
 # It will be added to the WARC files and reported to the tracker.
-VERSION = '20241108.03'
+VERSION = '20241109.01'
 USER_AGENT = 'Mozilla/5.0 (X11; Linux i686; rv:124.0) Gecko/20100101 Firefox/124.0'
 TRACKER_ID = 'veoh'
 TRACKER_HOST = 'legacy-api.arpa.li'
@@ -311,15 +311,12 @@ class WgetArgs(object):
             if item_type == 'video':
                 wget_args.extend(['--warc-header', 'veoh-video: '+item_value])
                 wget_args.append('https://veoh.com/watch/'+item_value)
-            #elif item_type == 'user':
-            #    wget_args.extend(['--warc-header', 'veoh-user: '+item_value])
-            #    wget_args.append('https://veoh.com/users/'+item_value)
-            #elif item_type == 'group':
-            #    wget_args.extend(['--warc-header', 'veoh-list: '+item_value])
-            #    wget_args.append('https://veoh.com/list/groups/groups_'+item_value)
-            #elif item_type == 'collection':
-            #    wget_args.extend(['--warc-header', 'veoh-collection: '+item_value])
-            #    wget_args.append('https://veoh.com/list-c/'+item_value)
+            elif item_type == 'user':
+                wget_args.extend(['--warc-header', 'veoh-user: '+item_value])
+                wget_args.append('https://veoh.com/users/'+item_value)
+            elif item_type == 'list-c':
+                wget_args.extend(['--warc-header', 'veoh-list-c: '+item_value])
+                wget_args.append('https://veoh.com/list-c/'+item_value)
             else:
                 raise Exception('Unknown item')
 
