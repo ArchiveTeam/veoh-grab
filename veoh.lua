@@ -468,7 +468,7 @@ print('POSTing', url, body_data)
           ["details"]={["requestName"]="userJoinedGroup"},
         },
       }) do
-        for _, type_name in pairs({"main", "details"}) do
+        for _, type_name in pairs({"main"--[[, "details"]]}) do
           if not data[type_name] then
             data[type_name] = {}
           end
@@ -501,14 +501,14 @@ print('POSTing', url, body_data)
         end
       end
       queue_with_body("https://veoh.com/users/get/" .. item_value, "")
-      for _, page in pairs({
+      --[[for _, page in pairs({
         "published-videos",
         "favorites-videos",
         "published-groups",
         "joined-groups"
       }) do
         check("https://veoh.com/users/" .. item_value .. "/" .. page)
-      end
+      end]]
     elseif string.match(url, "/comments/[0-9]+$") then
       local pages = tonumber(json["totalRecord"]) / tonumber(json["recordPerPage"])
       for i=1,pages do
